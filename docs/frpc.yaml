@@ -1,0 +1,39 @@
+# Merge these sections into your mihomo configuration.
+# Replace the server address, token and SS password before deployment.
+listeners:
+  - name: frp-ss
+    type: shadowsocks
+    listen: 127.0.0.1
+    port: 18885
+    cipher: chacha20-ietf-poly1305
+    password: "replace-with-your-ss-password"
+    udp: true
+    # Remove this line to use mihomo's routing rules instead of direct egress.
+    proxy: DIRECT
+
+frpc:
+  enable: true
+  serverAddr: frps.example.com
+  serverPort: 8443
+  loginFailExit: false
+  auth:
+    method: token
+    token: "replace-with-your-frp-token"
+  transport:
+    protocol: tcp
+    tls:
+      enable: true
+  log:
+    to: console
+    level: info
+  proxies:
+    - name: ss-tcp
+      type: tcp
+      localIP: 127.0.0.1
+      localPort: 18885
+      remotePort: 8885
+    - name: ss-udp
+      type: udp
+      localIP: 127.0.0.1
+      localPort: 18885
+      remotePort: 8885
