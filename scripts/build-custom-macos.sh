@@ -11,11 +11,11 @@ if [ "$(uname -s)" != Darwin ]; then
 fi
 
 custom_version=${VERSION:-v1.19.31-custom}
-binary=bin/miumiu-darwin-arm64
+binary=bin/mihomo-darwin-arm64
 archive=$binary-$custom_version.gz
 
-make darwin-arm64 NAME=miumiu VERSION="$custom_version" BINDIR=bin
-codesign --force --sign - --identifier miumiu "$binary"
+make darwin-arm64 NAME=mihomo VERSION="$custom_version" BINDIR=bin
+codesign --force --sign - --identifier mihomo "$binary"
 codesign --verify --strict --verbose=2 "$binary"
 
 # Keep the executable as well as the distributable archive.

@@ -85,24 +85,24 @@ frp 自身包级日志、注册表和加密 salt 仍按协议使用。依赖也�
 ```sh
 go test -race -tags with_gvisor -count=1 -timeout=120s ./component/frpc/... ./config
 ./scripts/build-custom-macos.sh
-./bin/miumiu-darwin-arm64 -t -f docs/frpc.yaml
+./bin/mihomo-darwin-arm64 -t -f docs/frpc.yaml
 ```
 
 构建脚本默认注入版本 `v1.19.31-custom`，生成可执行文件
-`bin/miumiu-darwin-arm64` 和压缩包
-`bin/miumiu-darwin-arm64-v1.19.31-custom.gz`。更新版本时可通过
+`bin/mihomo-darwin-arm64` 和压缩包
+`bin/mihomo-darwin-arm64-v1.19.31-custom.gz`。更新版本时可通过
 `VERSION=vX.Y.Z-custom ./scripts/build-custom-macos.sh` 覆盖。
 
 这是独立命令行程序，没有 `.app`、`Info.plist` 或 Bundle ID。脚本在构建后
-使用 macOS `codesign` 将代码签名标识设为 `miumiu`，替换 Go 链接器的
+使用 macOS `codesign` 将代码签名标识设为 `mihomo`，替换 Go 链接器的
 默认标识 `a.out`。使用的是 ad-hoc 签名，不依赖开发者证书，没有 Team ID，
 也不包含 Apple 公证；代码签名标识不是 Bundle ID。
 签名步骤需要在 macOS 上执行。可用以下命令检查产物：
 
 ```sh
-./bin/miumiu-darwin-arm64 -v
-codesign -dvv bin/miumiu-darwin-arm64
-codesign --verify --strict --verbose=2 bin/miumiu-darwin-arm64
+./bin/mihomo-darwin-arm64 -v
+codesign -dvv bin/mihomo-darwin-arm64
+codesign --verify --strict --verbose=2 bin/mihomo-darwin-arm64
 ```
 
 集成测试仅使用临时目录、loopback 端口和测试凭证。测试用 frps 作为独立
