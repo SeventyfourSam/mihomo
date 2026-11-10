@@ -208,6 +208,7 @@ jobs:
             gh release create "$tag" --verify-tag --title "$VERSION" \
               --draft --notes-file "$RUNNER_TEMP/custom-release-notes.txt"
           fi
-          sha256sum *.gz *.zip > SHA256SUMS
-          gh release upload "$tag" *.gz *.zip SHA256SUMS --clobber
+          printf '%s\n' "$VERSION" > version.txt
+          sha256sum *.gz *.zip version.txt > SHA256SUMS
+          gh release upload "$tag" *.gz *.zip version.txt SHA256SUMS --clobber
           gh release edit "$tag" --draft=false --latest

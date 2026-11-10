@@ -24,11 +24,12 @@ import (
 )
 
 const (
-	baseReleaseURL    = "https://github.com/MetaCubeX/mihomo/releases/latest/download/"
-	versionReleaseURL = "https://github.com/MetaCubeX/mihomo/releases/latest/download/version.txt"
+	baseReleaseURL    = customReleaseURL + "latest/download/"
+	versionReleaseURL = baseReleaseURL + "version.txt"
 
-	baseAlphaURL    = "https://github.com/MetaCubeX/mihomo/releases/download/Prerelease-Alpha/"
-	versionAlphaURL = "https://github.com/MetaCubeX/mihomo/releases/download/Prerelease-Alpha/version.txt"
+	// All API channel aliases use this fork's single custom release channel.
+	baseAlphaURL    = baseReleaseURL
+	versionAlphaURL = versionReleaseURL
 
 	// MaxPackageFileSize is a maximum package file length in bytes. The largest
 	// package whose size is limited by this constant currently has the size of
@@ -50,6 +51,9 @@ type CoreUpdater struct {
 var DefaultCoreUpdater = CoreUpdater{}
 
 func (u *CoreUpdater) CoreBaseName() string {
+	if name := customCoreBaseName(runtime.GOOS, runtime.GOARCH); name != "" {
+		return name
+	}
 	switch runtime.GOARCH {
 	case "arm":
 		// mihomo-linux-armv5
@@ -131,7 +135,7 @@ func (u *CoreUpdater) Update(currentExePath string, channel string, force bool) 
 	} else {
 		packageName = packageName + ".gz"
 	}
-	packageURL := baseURL + packageName
+	packageURL := customPackageURL(baseURL, latestVersion, packageName)
 	log.Infoln("updater: updating using url: %s", packageURL)
 
 	workDir := filepath.Dir(currentExePath)
@@ -158,6 +162,9 @@ func (u *CoreUpdater) Update(currentExePath string, channel string, force bool) 
 	err = u.unpack(updateDir, packagePath, info.Mode())
 	if err != nil {
 		return fmt.Errorf("unpacking: %w", err)
+	}
+	if err = prepareCustomCore(packagePath, updateExePath); err != nil {
+		return err
 	}
 
 	err = u.backup(currentExePath, backupExePath, backupDir)
@@ -187,11 +194,17 @@ func (u *CoreUpdater) getLatestVersion(versionURL string) (version string, err e
 		}
 	}()
 
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("version request: %s", resp.Status)
+	}
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
 	}
-	content := strings.TrimRight(string(body), "\n")
+	content := strings.TrimSpace(string(body))
+	if err := validateCustomVersion(content); err != nil {
+		return "", err
+	}
 	return content, nil
 }
 
@@ -211,6 +224,9 @@ func (u *CoreUpdater) download(updateDir, packagePath, packageURL string) (err e
 		}
 	}()
 
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("package request: %s", resp.Status)
+	}
 	log.Debugln("updateDir %s", updateDir)
 	err = os.Mkdir(updateDir, 0o755)
 	if err != nil {

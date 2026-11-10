@@ -47,7 +47,15 @@ Each GitHub Release contains:
 
 - `mihomo-darwin-arm64-<version>.gz`
 - `mihomo-windows-amd64-<version>.zip`
+- `version.txt`
 - `SHA256SUMS`
+
+Starting with `v1.19.33-custom.3`, `POST /upgrade` updates the core exclusively
+from this fork. The default, `release`, and `alpha` channel parameters all use
+the latest custom release. A non-custom version or failed download stops the
+update before replacement. Packages are downloaded from their exact version
+tag. Versions up to `v1.19.33-custom.2` still use the upstream updater; install
+`.3` or later manually once to switch the update source.
 
 Rerunning a published version leaves it unchanged; an interrupted draft can be
 completed by rerunning the workflow. Build artifacts are also retained for seven
