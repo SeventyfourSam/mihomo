@@ -8,8 +8,9 @@ building or publishing. **Actions → Custom Release → Run workflow** performs
 the same check immediately.
 
 When a new upstream release exists, the workflow merges it locally, runs tests,
-then pushes the tested merge to `custom` and packages that exact commit. Merge
-conflicts, test failures, or a rejected push stop the workflow. It never force
+then pushes the tested merge and its version tag atomically and packages that
+exact commit. Merge conflicts, test failures, or a rejected push stop the
+workflow. It never force
 pushes the branch or automatically resolves conflicts. No release is published
 unless both platform builds succeed. Ordinary pushes to `custom` do not build.
 
@@ -59,10 +60,13 @@ disabled in this fork's Actions settings. Their files remain unchanged for
 upstream merges. Keep them disabled: their `v*` triggers also match custom
 release tags and their release tasks are intended for MetaCubeX's repository.
 
-Automatic merge pushes use a write-enabled deploy key dedicated to this
-repository, stored in the Actions secret `CUSTOM_UPSTREAM_SSH_KEY`. This also
+Automatic merge and version tag pushes use a write-enabled deploy key dedicated
+to this repository, stored in the Actions secret `CUSTOM_UPSTREAM_SSH_KEY`. This also
 allows upstream workflow files to be merged without requiring a personal access
-token. Only sync runs receive the SSH key; manually tagged builds do not. The
+token. Only sync runs and the moving `custom` tag receive the SSH key; explicitly
+versioned tags do not. Automatically pushed version tags skip duplicate builds.
+Release publication verifies the existing version tag and its tested commit,
+so a later workflow change on the default branch does not affect publication. The
 built-in `GITHUB_TOKEN` is read only during sync, tests, and packaging; only the
 release job has `contents: write`.
 

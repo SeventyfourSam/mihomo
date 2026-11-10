@@ -39,10 +39,19 @@ jobs:
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          ref: ${{ github.event_name == 'push' && github.ref || 'custom' }}
+          ref: ${{ github.event_name == 'push' && github.sha || 'custom' }}
           fetch-depth: 0
-          ssh-key: ${{ github.event_name != 'push' && secrets.CUSTOM_UPSTREAM_SSH_KEY || '' }}
-          persist-credentials: ${{ github.event_name != 'push' }}
+          ssh-key: ${{ (github.event_name != 'push' || github.ref_name == 'custom') && secrets.CUSTOM_UPSTREAM_SSH_KEY || '' }}
+          persist-credentials: ${{ github.event_name != 'push' || github.ref_name == 'custom' }}
+      - name: Skip tags already built by upstream sync
+        if: github.event_name == 'push'
+        id: trigger
+        run: |
+          if [[ $(git cat-file -t "$GITHUB_REF") == tag && \
+            $(git for-each-ref --format='%(contents:subject)' "$GITHUB_REF") == 'Custom Release run '* ]]; then
+            echo 'This automatic tag is built by its originating run.'
+            echo 'skip=true' >> "$GITHUB_OUTPUT"
+          fi
       - name: Merge latest upstream stable release
         if: github.event_name != 'push'
         id: sync
@@ -63,12 +72,12 @@ jobs:
           git merge --no-edit "upstream/$upstream"
           echo 'changed=true' >> "$GITHUB_OUTPUT"
       - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c
-        if: github.event_name == 'push' || steps.sync.outputs.changed == 'true'
+        if: steps.trigger.outputs.skip != 'true' && (github.event_name == 'push' || steps.sync.outputs.changed == 'true')
         with:
           go-download-base-url: https://github.com/MetaCubeX/go/releases/download/build
           go-version: "1.26"
       - name: Determine version
-        if: github.event_name == 'push' || steps.sync.outputs.changed == 'true'
+        if: steps.trigger.outputs.skip != 'true' && (github.event_name == 'push' || steps.sync.outputs.changed == 'true')
         id: version
         run: |
           git fetch --no-tags https://github.com/MetaCubeX/mihomo.git \
@@ -92,15 +101,26 @@ jobs:
           printf 'upstream=%s\nversion=%s\ncommit=%s\n' \
             "$upstream" "$version" "$commit" >> "$GITHUB_OUTPUT"
       - name: Test
-        if: github.event_name == 'push' || steps.sync.outputs.changed == 'true'
+        if: steps.trigger.outputs.skip != 'true' && (github.event_name == 'push' || steps.sync.outputs.changed == 'true')
         run: |
           go version
           go test ./...
           go test -tags with_gvisor ./...
-      - name: Push tested merge to custom
-        if: github.event_name != 'push' && steps.sync.outputs.changed == 'true'
+      - name: Push tested merge and version tag
+        if: steps.sync.outputs.changed == 'true' || (github.event_name == 'push' && github.ref_name == 'custom')
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          if ! git push origin HEAD:refs/heads/custom; then
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          if ! git show-ref --verify --quiet "refs/tags/$VERSION"; then
+            git tag -a "$VERSION" -m "Custom Release run $GITHUB_RUN_ID"
+          fi
+          refs=("refs/tags/$VERSION")
+          if [[ "$GITHUB_EVENT_NAME" != push ]]; then
+            refs=(HEAD:refs/heads/custom "${refs[@]}")
+          fi
+          if ! git push --atomic origin "${refs[@]}"; then
             echo '::error::Push failed. Check CUSTOM_UPSTREAM_SSH_KEY and its write-enabled deploy key, or rerun after a concurrent custom update.'
             exit 1
           fi
@@ -170,6 +190,7 @@ jobs:
         working-directory: release
         run: |
           tag="$VERSION"
+          [[ $(gh api "repos/$GH_REPO/commits/$tag" --jq '.sha') == "$SOURCE_SHA" ]]
           if draft=$(gh release view "$tag" --json isDraft --jq '.isDraft' 2>/dev/null); then
             if [[ "$draft" == false ]]; then
               echo "Release $tag is already published."
@@ -184,7 +205,7 @@ jobs:
               'Windows amd64: x86-64 v1 executable (.zip).' \
               'Both builds include with_gvisor and use MetaCubeX/go 1.26.' \
               > "$RUNNER_TEMP/custom-release-notes.txt"
-            gh release create "$tag" --target "$SOURCE_SHA" --title "$VERSION" \
+            gh release create "$tag" --verify-tag --title "$VERSION" \
               --draft --notes-file "$RUNNER_TEMP/custom-release-notes.txt"
           fi
           sha256sum *.gz *.zip > SHA256SUMS
