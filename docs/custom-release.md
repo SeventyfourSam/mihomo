@@ -59,13 +59,12 @@ disabled in this fork's Actions settings. Their files remain unchanged for
 upstream merges. Keep them disabled: their `v*` triggers also match custom
 release tags and their release tasks are intended for MetaCubeX's repository.
 
-The sync/test and release jobs have `contents: write`; packaging jobs are read
-only. The built-in `GITHUB_TOKEN` handles ordinary pushes and releases. If an
-upstream release modifies `.github/workflows/`, configure the repository Actions
-secret `UPSTREAM_SYNC_TOKEN` with a fine-grained PAT scoped to this fork with
-**Contents: Read and write** and **Workflows: Read and write**. Without this,
-GitHub can reject the merge push; the workflow fails with an explanation instead
-of dropping the upstream workflow changes.
+Automatic merge pushes use a write-enabled deploy key dedicated to this
+repository, stored in the Actions secret `CUSTOM_UPSTREAM_SSH_KEY`. This also
+allows upstream workflow files to be merged without requiring a personal access
+token. Only sync runs receive the SSH key; manually tagged builds do not. The
+built-in `GITHUB_TOKEN` is read only during sync, tests, and packaging; only the
+release job has `contents: write`.
 
 GitHub can delay scheduled runs, and disables schedules in inactive public
 repositories after 60 days. See [scheduled workflow behavior](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule).

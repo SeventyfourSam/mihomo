@@ -29,8 +29,6 @@ jobs:
     if: github.event_name == 'push' || github.ref == 'refs/heads/custom'
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    permissions:
-      contents: write
     outputs:
       upstream: ${{ steps.version.outputs.upstream }}
       version: ${{ steps.version.outputs.version }}
@@ -43,7 +41,8 @@ jobs:
         with:
           ref: ${{ github.event_name == 'push' && github.ref || 'custom' }}
           fetch-depth: 0
-          token: ${{ secrets.UPSTREAM_SYNC_TOKEN || github.token }}
+          ssh-key: ${{ github.event_name != 'push' && secrets.CUSTOM_UPSTREAM_SSH_KEY || '' }}
+          persist-credentials: ${{ github.event_name != 'push' }}
       - name: Merge latest upstream stable release
         if: github.event_name != 'push'
         id: sync
@@ -102,7 +101,7 @@ jobs:
         if: github.event_name != 'push' && steps.sync.outputs.changed == 'true'
         run: |
           if ! git push origin HEAD:refs/heads/custom; then
-            echo '::error::Push failed. If upstream changed workflows, configure UPSTREAM_SYNC_TOKEN with Contents and Workflows write permissions. A concurrent custom update also requires a new run.'
+            echo '::error::Push failed. Check CUSTOM_UPSTREAM_SSH_KEY and its write-enabled deploy key, or rerun after a concurrent custom update.'
             exit 1
           fi
 
