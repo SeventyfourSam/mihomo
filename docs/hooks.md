@@ -48,6 +48,15 @@ hooks:
   has no real target IP, only `HOST` is emitted.
 - Literal-IP connections have `host: ""` and no `HOST` event.
 
+DNS IP events include HTTPS (type 65) and SVCB (type 64) IPv4/IPv6 hints,
+plus A/AAAA records associated through CNAME or service targets in Answer and
+Additional. Unrelated records, such as name-server glue, are excluded. Events
+keep the original question hostname; the DNS response is not rewritten and no
+extra lookup is performed. AliasMode parameters are ignored. A record with only
+ECH/ALPN metadata has no IP event. Cache hits still run hooks before reply.
+Normal fake-ip handling returns empty HTTPS/SVCB answers; real responses for
+fake-ip filter exceptions receive the same IP checks as other real responses.
+
 Hook conditions are independent of routing: DIRECT, GLOBAL, selected proxies
 and normal rule routing all participate. Existing domain, IP, process, inbound,
 network and `RULE-SET` conditions and `AND` / `OR` / `NOT` are supported.

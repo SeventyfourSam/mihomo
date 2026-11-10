@@ -20,7 +20,7 @@ func withHooks(next handler) handler {
 		ctx.Context = bridge.Without(ctx.Context)
 		response, err := next(ctx, request)
 		if err == nil && response != nil && ctx.Type() != icontext.DNSTypeFakeIP {
-			err = s.IPs(ctx, msgToIP(response), "dns", 0)
+			err = s.IPs(ctx, hookResponseIPs(request.Question[0].Name, response), "dns", 0)
 		}
 		if err != nil {
 			return nil, err
