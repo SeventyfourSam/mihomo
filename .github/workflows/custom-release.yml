@@ -133,7 +133,7 @@ jobs:
       matrix:
         include:
           - target: darwin-arm64
-            runner: macos-15
+            runner: macos-26
             extension: gz
           - target: windows-amd64
             runner: ubuntu-latest
