@@ -683,6 +683,9 @@ func match(metadata *C.Metadata, helper C.RuleMatchHelper) (C.Proxy, C.Rule, err
 				}
 
 				if metadata.NetWork == C.UDP && !adapter.SupportUDP() {
+					if !UDPFallback() {
+						return adapter, rule, fmt.Errorf("matched %s(%s) -> %s: UDP is not supported (udp-fallback: false)", rule.RuleType(), rule.Payload(), adapter.Name())
+					}
 					log.Debugln("%s UDP is not supported", adapter.Name())
 					continue
 				}

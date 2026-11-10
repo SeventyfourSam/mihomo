@@ -40,7 +40,7 @@ func TestDocumentedHooksConfiguration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, body, ok := strings.Cut(string(document), "```yaml\n")
+	_, body, ok := strings.Cut(strings.ReplaceAll(string(document), "\r\n", "\n"), "```yaml\n")
 	if !ok {
 		t.Fatal("missing example")
 	}

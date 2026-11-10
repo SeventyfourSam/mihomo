@@ -175,6 +175,7 @@ func GetGeneral() *config.General {
 		GeodataLoader:     geodata.LoaderName(),
 		GeositeMatcher:    geodata.SiteMatcherName(),
 		TCPConcurrent:     dialer.GetTcpConcurrent(),
+		UDPFallback:       tunnel.UDPFallback(),
 		FindProcessMode:   tunnel.FindProcessMode(),
 		Sniffing:          tunnel.IsSniffing(),
 		GlobalUA:          mihomoHttp.UA(),
@@ -397,6 +398,7 @@ func temporaryUpdateGeneral(general *config.General) func() {
 func updateGeneral(general *config.General, logging bool) {
 	tunnel.SetMode(general.Mode)
 	tunnel.SetFindProcessMode(general.FindProcessMode)
+	tunnel.SetUDPFallback(general.UDPFallback)
 	resolver.DisableIPv6 = !general.IPv6
 
 	dialer.SetTcpConcurrent(general.TCPConcurrent)

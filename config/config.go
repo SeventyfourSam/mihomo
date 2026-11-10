@@ -62,6 +62,7 @@ type General struct {
 	GeodataLoader     string                  `json:"geodata-loader"`
 	GeositeMatcher    string                  `json:"geosite-matcher"`
 	TCPConcurrent     bool                    `json:"tcp-concurrent"`
+	UDPFallback       bool                    `json:"udp-fallback"`
 	FindProcessMode   process.FindProcessMode `json:"find-process-mode"`
 	Sniffing          bool                    `json:"sniffing"`
 	GlobalUA          string                  `json:"global-ua"`
@@ -445,6 +446,7 @@ type RawConfig struct {
 	GeodataLoader                 string                  `yaml:"geodata-loader" json:"geodata-loader"`
 	GeositeMatcher                string                  `yaml:"geosite-matcher" json:"geosite-matcher"`
 	TCPConcurrent                 bool                    `yaml:"tcp-concurrent" json:"tcp-concurrent"`
+	UDPFallback                   bool                    `yaml:"udp-fallback" json:"udp-fallback"`
 	FindProcessMode               process.FindProcessMode `yaml:"find-process-mode" json:"find-process-mode"`
 	GlobalClientFingerprint       string                  `yaml:"global-client-fingerprint" json:"global-client-fingerprint"`
 	GlobalUA                      string                  `yaml:"global-ua" json:"global-ua"`
@@ -508,6 +510,7 @@ func DefaultRawConfig() *RawConfig {
 		Proxy:             []map[string]any{},
 		ProxyGroup:        []map[string]any{},
 		TCPConcurrent:     false,
+		UDPFallback:       true,
 		FindProcessMode:   process.FindProcessStrict,
 		GlobalUA:          "clash.meta/" + C.Version,
 		ETagSupport:       true,
@@ -814,6 +817,7 @@ func parseGeneral(cfg *RawConfig) (*General, error) {
 		GeodataLoader:     cfg.GeodataLoader,
 		GeositeMatcher:    cfg.GeositeMatcher,
 		TCPConcurrent:     cfg.TCPConcurrent,
+		UDPFallback:       cfg.UDPFallback,
 		FindProcessMode:   cfg.FindProcessMode,
 		GlobalUA:          cfg.GlobalUA,
 		ETagSupport:       cfg.ETagSupport,

@@ -27,6 +27,11 @@ find-process-mode: strict
 
 mode: rule
 
+# 命中规则的出站不支持 UDP 时是否继续匹配后续规则，默认 true。
+# false：终止本次 UDP 处理；不改变代理组自身的选点、重试和 empty-fallback。
+# 对新建 UDP 关联生效；已有 UDP 关联沿用原出站，直到关闭或超时。
+udp-fallback: true
+
 #自定义 geodata url
 geox-url:
   geoip: "https://fastly.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/geoip.dat"

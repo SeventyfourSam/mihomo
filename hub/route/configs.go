@@ -55,6 +55,7 @@ type configSchema struct {
 	IPv6              *bool                    `json:"ipv6"`
 	Sniffing          *bool                    `json:"sniffing"`
 	TcpConcurrent     *bool                    `json:"tcp-concurrent"`
+	UDPFallback       *bool                    `json:"udp-fallback"`
 	FindProcessMode   *process.FindProcessMode `json:"find-process-mode"`
 	InterfaceName     *string                  `json:"interface-name"`
 }
@@ -389,6 +390,9 @@ func patchConfigs(w http.ResponseWriter, r *http.Request) {
 
 	if general.FindProcessMode != nil {
 		tunnel.SetFindProcessMode(*general.FindProcessMode)
+	}
+	if general.UDPFallback != nil {
+		tunnel.SetUDPFallback(*general.UDPFallback)
 	}
 
 	if general.LogLevel != nil {
