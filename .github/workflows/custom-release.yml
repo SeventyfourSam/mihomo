@@ -48,10 +48,13 @@ jobs:
       - name: Determine version
         id: version
         run: |
-          upstream=$(git describe --tags --match 'v[0-9]*' --exclude '*-*' --abbrev=0)
+          git fetch --no-tags https://github.com/MetaCubeX/mihomo.git \
+            'refs/tags/v*:refs/tags/upstream/v*'
+          upstream=$(git describe --tags --match 'upstream/v[0-9]*' --exclude '*-*' --abbrev=0)
+          upstream=${upstream#upstream/}
           [[ "$upstream" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
-          printf 'upstream=%s\nversion=%s-custom.g%s\n' \
-            "$upstream" "$upstream" "${GITHUB_SHA:0:12}" >> "$GITHUB_OUTPUT"
+          printf 'upstream=%s\nversion=%s-custom.%s\n' \
+            "$upstream" "$upstream" "$GITHUB_RUN_NUMBER" >> "$GITHUB_OUTPUT"
       - name: Test
         run: |
           go version
@@ -119,7 +122,7 @@ jobs:
       - name: Publish release
         working-directory: release
         run: |
-          tag="custom-${VERSION}"
+          tag="$VERSION"
           if draft=$(gh release view "$tag" --json isDraft --jq '.isDraft' 2>/dev/null); then
             if [[ "$draft" == false ]]; then
               echo "Release $tag is already published."

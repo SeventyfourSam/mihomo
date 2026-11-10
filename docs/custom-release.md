@@ -19,11 +19,18 @@ After both builds succeed, the workflow publishes a GitHub Release containing:
 - `mihomo-windows-amd64-<version>.zip`
 - `SHA256SUMS`
 
-Versions combine the nearest upstream stable tag and the source commit, for
-example `v1.19.33-custom.g0123456789ab`. Release tags start with `custom-`, so they
-do not match the upstream workflows' `v*` triggers. Both packages come from the
-same tested commit. Rerunning a published commit leaves its release unchanged;
-an interrupted draft can be completed by rerunning the workflow.
+Versions and release tags combine the nearest upstream stable tag and this
+workflow's run number, for example `v1.19.33-custom.2`. The number increases
+across upstream versions; rerunning the same workflow run keeps its number.
+Upstream tags are fetched separately, since merging commits does not copy tags
+to this fork. Both packages come from the same tested commit. Rerunning a
+published run leaves its release unchanged; an interrupted draft can be
+completed by rerunning the workflow.
+
+The inherited **Build**, **Test**, and **Trigger CMFA Update** workflows are
+disabled in this fork's Actions settings. Their files remain unchanged for
+upstream merges. Keep them disabled: their `v*` triggers also match custom
+release tags and their release tasks are intended for MetaCubeX's repository.
 
 The workflow needs no additional repository secrets. Only the release job has
 `contents: write`; test and build jobs have read access. It does not synchronize
