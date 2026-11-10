@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: custom-release
+  group: custom-release-${{ github.ref }}
   cancel-in-progress: false
 
 defaults:
