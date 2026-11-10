@@ -1,0 +1,142 @@
+name: Custom Release
+
+on:
+  push:
+    branches: [custom]
+    paths-ignore:
+      - "docs/**"
+      - "README.md"
+      - ".github/ISSUE_TEMPLATE/**"
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: custom-release
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  CGO_ENABLED: "0"
+  GOTOOLCHAIN: local
+
+jobs:
+  test:
+    if: github.ref == 'refs/heads/custom'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      upstream: ${{ steps.version.outputs.upstream }}
+      version: ${{ steps.version.outputs.version }}
+    env:
+      SKIP_INTEROP_TEST: "1"
+      SKIP_CONCURRENT_TEST: "1"
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c
+        with:
+          go-download-base-url: https://github.com/MetaCubeX/go/releases/download/build
+          go-version: "1.26"
+      - name: Determine version
+        id: version
+        run: |
+          upstream=$(git describe --tags --match 'v[0-9]*' --exclude '*-*' --abbrev=0)
+          [[ "$upstream" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          printf 'upstream=%s\nversion=%s-custom.g%s\n' \
+            "$upstream" "$upstream" "${GITHUB_SHA:0:12}" >> "$GITHUB_OUTPUT"
+      - name: Test
+        run: |
+          go version
+          go test ./...
+          go test -tags with_gvisor ./...
+
+  build:
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: darwin-arm64
+            runner: macos-15
+            extension: gz
+          - target: windows-amd64
+            runner: ubuntu-latest
+            extension: zip
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    env:
+      VERSION: ${{ needs.test.outputs.version }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c
+        with:
+          go-download-base-url: https://github.com/MetaCubeX/go/releases/download/build
+          go-version: "1.26"
+      - name: Build and sign macOS arm64
+        if: matrix.target == 'darwin-arm64'
+        run: sh scripts/build-custom-macos.sh
+      - name: Build Windows amd64
+        if: matrix.target == 'windows-amd64'
+        run: |
+          make windows-amd64-v1 NAME=mihomo VERSION="$VERSION" BINDIR=bin
+          cd bin
+          mv mihomo-windows-amd64-v1.exe mihomo-windows-amd64.exe
+          zip -9 "mihomo-windows-amd64-${VERSION}.zip" mihomo-windows-amd64.exe
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: custom-${{ matrix.target }}
+          path: bin/mihomo-${{ matrix.target }}-${{ env.VERSION }}.${{ matrix.extension }}
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    needs: [test, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      UPSTREAM: ${{ needs.test.outputs.upstream }}
+      VERSION: ${{ needs.test.outputs.version }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          pattern: custom-*
+          merge-multiple: true
+          path: release
+      - name: Publish release
+        working-directory: release
+        run: |
+          tag="custom-${VERSION}"
+          if draft=$(gh release view "$tag" --json isDraft --jq '.isDraft' 2>/dev/null); then
+            if [[ "$draft" == false ]]; then
+              echo "Release $tag is already published."
+              exit 0
+            fi
+          else
+            printf '%s\n' \
+              "Upstream: MetaCubeX/mihomo ${UPSTREAM} (Meta)." \
+              "Source commit: ${GITHUB_SHA}" \
+              '' \
+              'macOS arm64: ad-hoc signed executable (.gz).' \
+              'Windows amd64: x86-64 v1 executable (.zip).' \
+              'Both builds include with_gvisor and use MetaCubeX/go 1.26.' \
+              > "$RUNNER_TEMP/custom-release-notes.txt"
+            gh release create "$tag" --target "$GITHUB_SHA" --title "$VERSION" \
+              --draft --notes-file "$RUNNER_TEMP/custom-release-notes.txt"
+          fi
+          sha256sum *.gz *.zip > SHA256SUMS
+          gh release upload "$tag" *.gz *.zip SHA256SUMS --clobber
+          gh release edit "$tag" --draft=false --latest
