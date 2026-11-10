@@ -7,6 +7,7 @@ import (
 	"net/netip"
 	"strings"
 
+	"github.com/metacubex/mihomo/common/hook"
 	N "github.com/metacubex/mihomo/common/net"
 	C "github.com/metacubex/mihomo/constant"
 	"github.com/metacubex/mihomo/tunnel/statistic"
@@ -22,6 +23,7 @@ func New(proxy C.ProxyAdapter, statistic bool) C.Dialer {
 }
 
 func (p proxyDialer) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	ctx = hook.Without(ctx)
 	currentMeta := &C.Metadata{Type: C.INNER}
 	if err := currentMeta.SetRemoteAddress(address); err != nil {
 		return nil, err
@@ -51,6 +53,7 @@ func (p proxyDialer) DialContext(ctx context.Context, network, address string) (
 }
 
 func (p proxyDialer) ListenPacket(ctx context.Context, network, address string, rAddrPort netip.AddrPort) (net.PacketConn, error) {
+	ctx = hook.Without(ctx)
 	if !strings.HasPrefix(network, "udp") {
 		return nil, fmt.Errorf("proxyDialer only support udp network, but got: %s", network)
 	}

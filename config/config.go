@@ -24,6 +24,7 @@ import (
 	"github.com/metacubex/mihomo/component/fakeip"
 	"github.com/metacubex/mihomo/component/frpc"
 	"github.com/metacubex/mihomo/component/geodata"
+	"github.com/metacubex/mihomo/component/hook"
 	"github.com/metacubex/mihomo/component/process"
 	"github.com/metacubex/mihomo/component/resolver"
 	"github.com/metacubex/mihomo/component/sniffer"
@@ -213,6 +214,7 @@ type Config struct {
 	Sniffer       *sniffer.Config
 	TLS           *TLS
 	FRPC          *frpc.Config
+	Hooks         *hook.Config
 }
 
 type RawCors struct {
@@ -471,6 +473,9 @@ type RawConfig struct {
 	TLS           RawTLS                    `yaml:"tls" json:"tls"`
 	FRPC          *frpc.RawConfig           `yaml:"frpc" json:"frpc,omitempty"`
 
+	HookProviders map[string]hook.ProviderConfig `yaml:"hook-providers" json:"hook-providers,omitempty"`
+	Hooks         []hook.RuleConfig              `yaml:"hooks" json:"hooks,omitempty"`
+
 	ClashForAndroid RawClashForAndroid `yaml:"clash-for-android" json:"clash-for-android"`
 }
 
@@ -703,6 +708,10 @@ func ParseRawConfig(rawCfg *RawConfig) (*Config, error) {
 		return nil, err
 	}
 	config.RuleProviders = ruleProviders
+	config.Hooks, err = hook.Parse(rawCfg.HookProviders, rawCfg.Hooks, ruleProviders)
+	if err != nil {
+		return nil, err
+	}
 
 	subRules, err := parseSubRules(rawCfg, proxies, ruleProviders)
 	if err != nil {

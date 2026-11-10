@@ -7,6 +7,7 @@ import (
 	"net/netip"
 	"time"
 
+	"github.com/metacubex/mihomo/common/hook"
 	"github.com/metacubex/mihomo/common/utils"
 	"github.com/metacubex/mihomo/component/trie"
 
@@ -56,7 +57,8 @@ type Resolver interface {
 }
 
 // LookupIPv4WithResolver same as LookupIPv4, but with a resolver
-func LookupIPv4WithResolver(ctx context.Context, host string, r Resolver) ([]netip.Addr, error) {
+func LookupIPv4WithResolver(ctx context.Context, host string, r Resolver) (ips []netip.Addr, err error) {
+	defer hook.LookupResult(ctx, host, &ips, &err)
 	if node, ok := DefaultHosts.Search(host, false); ok {
 		if addrs := utils.Filter(node.IPs, func(ip netip.Addr) bool {
 			return ip.Is4()
@@ -103,7 +105,8 @@ func ResolveIPv4(ctx context.Context, host string) (netip.Addr, error) {
 }
 
 // LookupIPv6WithResolver same as LookupIPv6, but with a resolver
-func LookupIPv6WithResolver(ctx context.Context, host string, r Resolver) ([]netip.Addr, error) {
+func LookupIPv6WithResolver(ctx context.Context, host string, r Resolver) (ips []netip.Addr, err error) {
+	defer hook.LookupResult(ctx, host, &ips, &err)
 	if DisableIPv6 {
 		return nil, ErrIPv6Disabled
 	}
@@ -152,7 +155,8 @@ func ResolveIPv6(ctx context.Context, host string) (netip.Addr, error) {
 }
 
 // LookupIPWithResolver same as LookupIP, but with a resolver
-func LookupIPWithResolver(ctx context.Context, host string, r Resolver) ([]netip.Addr, error) {
+func LookupIPWithResolver(ctx context.Context, host string, r Resolver) (ips []netip.Addr, err error) {
+	defer hook.LookupResult(ctx, host, &ips, &err)
 	if node, ok := DefaultHosts.Search(host, false); ok {
 		return node.IPs, nil
 	}

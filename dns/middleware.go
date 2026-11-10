@@ -245,5 +245,5 @@ func newHandler(resolver resolver.Resolver, mapper *ResolverEnhancer) handler {
 		middlewares = append(middlewares, withMapping(mapper.mapping))
 	}
 
-	return compose(middlewares, withResolver(resolver, mapper.ipv6))
+	return withHooks(compose(middlewares, withResolver(resolver, mapper.ipv6)))
 }

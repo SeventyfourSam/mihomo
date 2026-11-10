@@ -8,6 +8,7 @@ import (
 	"net"
 	"strings"
 
+	"github.com/metacubex/mihomo/common/hook"
 	N "github.com/metacubex/mihomo/common/net"
 	"github.com/metacubex/mihomo/component/dialer"
 	"github.com/metacubex/mihomo/component/resolver"
@@ -28,6 +29,7 @@ func NewDNSDialer(r resolver.Resolver, proxyAdapter C.ProxyAdapter, proxyName st
 }
 
 func (d *DNSDialer) DialContext(ctx context.Context, network, addr string) (net.Conn, error) {
+	ctx = hook.Without(ctx)
 	r := d.r
 	proxyName := d.proxyName
 	proxyAdapter := d.proxyAdapter
@@ -63,7 +65,7 @@ func (d *DNSDialer) DialContext(ctx context.Context, network, addr string) (net.
 				}
 				metadata.DstIP = dstIP
 			}
-			proxyAdapter, rule, err = resolveMetadata(metadata)
+			proxyAdapter, rule, err = resolveMetadata(ctx, metadata)
 			if err != nil {
 				return nil, err
 			}
@@ -129,6 +131,7 @@ func (d *DNSDialer) DialContext(ctx context.Context, network, addr string) (net.
 }
 
 func (d *DNSDialer) ListenPacket(ctx context.Context, network, addr string) (net.PacketConn, error) {
+	ctx = hook.Without(ctx)
 	r := d.r
 	proxyAdapter := d.proxyAdapter
 	proxyName := d.proxyName
@@ -153,7 +156,7 @@ func (d *DNSDialer) ListenPacket(ctx context.Context, network, addr string) (net
 	var rule C.Rule
 	if proxyAdapter == nil {
 		if proxyName == DnsRespectRules {
-			proxyAdapter, rule, err = resolveMetadata(metadata)
+			proxyAdapter, rule, err = resolveMetadata(ctx, metadata)
 			if err != nil {
 				return nil, err
 			}

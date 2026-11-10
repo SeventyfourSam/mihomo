@@ -19,6 +19,7 @@ import (
 	"github.com/metacubex/mihomo/component/dialer"
 	"github.com/metacubex/mihomo/component/frpc"
 	"github.com/metacubex/mihomo/component/geodata"
+	"github.com/metacubex/mihomo/component/hook"
 	mihomoHttp "github.com/metacubex/mihomo/component/http"
 	"github.com/metacubex/mihomo/component/iface"
 	"github.com/metacubex/mihomo/component/keepalive"
@@ -116,6 +117,7 @@ func ApplyConfig(cfg *config.Config, force bool) {
 	loadProvider(cfg.Providers)
 	updateProfile(cfg)
 	loadProvider(cfg.RuleProviders)
+	hook.Apply(cfg.Hooks)
 	runtime.GC()
 	tunnel.OnRunning()
 	updateUpdater(cfg)
@@ -532,6 +534,7 @@ func updateIPTables(cfg *config.Config) {
 }
 
 func Shutdown() {
+	hook.Shutdown()
 	frpc.Default.Stop()
 	listener.Cleanup()
 	tproxy.CleanupTProxyIPTables()

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/metacubex/mihomo/common/atomic"
+	"github.com/metacubex/mihomo/common/hook"
 	N "github.com/metacubex/mihomo/common/net"
 	"github.com/metacubex/mihomo/common/utils"
 	"github.com/metacubex/mihomo/component/loopback"
@@ -314,7 +315,7 @@ func preHandleMetadata(metadata *C.Metadata) error {
 	return nil
 }
 
-func resolveMetadata(metadata *C.Metadata) (proxy C.Proxy, rule C.Rule, err error) {
+func resolveMetadata(ctx context.Context, metadata *C.Metadata) (proxy C.Proxy, rule C.Rule, err error) {
 	if metadata.SpecialProxy != "" {
 		var exist bool
 		proxy, exist = proxies[metadata.SpecialProxy]
@@ -336,7 +337,7 @@ func resolveMetadata(metadata *C.Metadata) (proxy C.Proxy, rule C.Rule, err erro
 	helper := C.RuleMatchHelper{
 		ResolveIP: func() {
 			if !resolved && metadata.Host != "" && !metadata.Resolved() {
-				ctx, cancel := context.WithTimeout(context.Background(), resolver.DefaultDNSTimeout)
+				ctx, cancel := context.WithTimeout(ctx, resolver.DefaultDNSTimeout)
 				defer cancel()
 				ip, err := resolver.ResolveIP(ctx, metadata.Host)
 				if err != nil {
@@ -457,14 +458,14 @@ func handleUDPConn(packet C.PacketAdapter) {
 
 			_ = preHandleMetadata(metadata) // error was pre-checked
 
-			proxy, rule, err := resolveMetadata(metadata)
+			proxy, rule, hookCtx, err := resolveMetadataWithHooks(metadata)
 			if err != nil {
 				log.Warnln("[UDP] Parse metadata failed: %s", err.Error())
 				return nil, nil, err
 			}
 
 			dialMetadata := metadata.Pure()
-			ctx, cancel := context.WithTimeout(context.Background(), C.DefaultUDPTimeout)
+			ctx, cancel := context.WithTimeout(hookCtx, C.DefaultUDPTimeout)
 			defer cancel()
 			rawPc, err := retry(ctx, func(ctx context.Context) (C.PacketConn, error) {
 				return proxy.ListenPacketContext(ctx, dialMetadata)
@@ -476,7 +477,7 @@ func handleUDPConn(packet C.PacketAdapter) {
 			}
 			logMetadata(metadata, rule, rawPc)
 
-			pc := statistic.NewUDPTracker(rawPc, statistic.DefaultManager, metadata, rule, 0, 0, true)
+			pc := withUDPHooks(statistic.NewUDPTracker(rawPc, statistic.DefaultManager, metadata, rule, 0, 0, true), metadata, originMetadata, hookCtx)
 
 			sender.AddMapping(originMetadata, dialMetadata)
 			oAddrPort := dialMetadata.AddrPort()
@@ -551,7 +552,7 @@ func handleTCPConn(connCtx C.ConnContext) {
 		}()
 	}
 
-	proxy, rule, err := resolveMetadata(metadata)
+	proxy, rule, hookCtx, err := resolveMetadataWithHooks(metadata)
 	if err != nil {
 		log.Warnln("[Metadata] parse failed: %s", err.Error())
 		return
@@ -571,7 +572,7 @@ func handleTCPConn(connCtx C.ConnContext) {
 	var peekBytes []byte
 	var peekLen int
 
-	ctx, cancel := context.WithTimeout(context.Background(), C.DefaultTCPTimeout)
+	ctx, cancel := context.WithTimeout(hookCtx, C.DefaultTCPTimeout)
 	defer cancel()
 	remoteConn, err := retry(ctx, func(ctx context.Context) (remoteConn C.Conn, err error) {
 		remoteConn, err = proxy.DialContext(ctx, dialMetadata)
@@ -721,6 +722,9 @@ func getRules(metadata *C.Metadata) []C.Rule {
 }
 
 func shouldStopRetry(err error) bool {
+	if hook.IsBlocked(err) {
+		return true
+	}
 	if errors.Is(err, resolver.ErrIPNotFound) {
 		return true
 	}

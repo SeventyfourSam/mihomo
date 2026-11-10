@@ -98,6 +98,10 @@ func (s *packetSender) processPacket(pc C.PacketConn, packet C.PacketAdapter) {
 		s.AddMapping(originMetadata, metadata)
 		addr = metadata.UDPAddr()
 	}
+	if err := beforeUDPHook(s.ctx, pc, packet.Metadata(), addr); err != nil {
+		log.Warnln("[UDP] Hook blocked send: %v", err)
+		return
+	}
 	_ = handleUDPToRemote(packet, pc, addr)
 }
 

@@ -14,6 +14,7 @@ import (
 	"github.com/metacubex/mihomo/common/utils"
 	"github.com/metacubex/mihomo/common/xsync"
 	"github.com/metacubex/mihomo/component/ca"
+	"github.com/metacubex/mihomo/component/hook"
 	C "github.com/metacubex/mihomo/constant"
 	"github.com/metacubex/mihomo/log"
 
@@ -54,12 +55,20 @@ func (p *Proxy) AliveForTestUrl(url string) bool {
 
 // DialContext implements C.ProxyAdapter
 func (p *Proxy) DialContext(ctx context.Context, metadata *C.Metadata) (C.Conn, error) {
+	ctx, err := hook.ForAdapter(ctx, metadata, p.ProxyAdapter)
+	if err != nil {
+		return nil, err
+	}
 	conn, err := p.ProxyAdapter.DialContext(ctx, metadata)
 	return conn, err
 }
 
 // ListenPacketContext implements C.ProxyAdapter
 func (p *Proxy) ListenPacketContext(ctx context.Context, metadata *C.Metadata) (C.PacketConn, error) {
+	ctx, err := hook.ForAdapter(ctx, metadata, p.ProxyAdapter)
+	if err != nil {
+		return nil, err
+	}
 	pc, err := p.ProxyAdapter.ListenPacketContext(ctx, metadata)
 	return pc, err
 }

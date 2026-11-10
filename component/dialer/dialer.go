@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/metacubex/mihomo/common/atomic"
+	"github.com/metacubex/mihomo/common/hook"
 	"github.com/metacubex/mihomo/component/keepalive"
 	"github.com/metacubex/mihomo/component/mptcp"
 	"github.com/metacubex/mihomo/component/resolver"
@@ -38,6 +39,7 @@ func GetTcpConcurrent() bool {
 }
 
 func DialContext(ctx context.Context, network, address string, options ...Option) (net.Conn, error) {
+	ctx = hook.ForDial(ctx, address)
 	opt := applyOptions(options...)
 
 	if opt.network == 4 || opt.network == 6 {
@@ -141,6 +143,9 @@ func dialContext(ctx context.Context, network string, destination netip.Addr, po
 	var address string
 	destination, port = resolver.LookupIP4P(destination, port)
 	address = net.JoinHostPort(destination.String(), port)
+	if err := hook.BeforeDial(ctx, destination, port); err != nil {
+		return nil, err
+	}
 
 	netDialer := opt.netDialer
 	switch netDialer.(type) {
