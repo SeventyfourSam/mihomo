@@ -2,6 +2,7 @@ package frpc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -120,7 +122,7 @@ func TestConnectorUsesMihomoSocketPolicy(t *testing.T) {
 	c := newConnector(ctx, &cfg.common)
 	defer c.Close()
 	err = c.Open()
-	if err == nil || !strings.Contains(err.Error(), "interface") {
+	if err == nil || (!errors.Is(err, syscall.ENODEV) && !strings.Contains(err.Error(), "interface")) {
 		t.Fatalf("expected interface binding failure, got %v", err)
 	}
 }

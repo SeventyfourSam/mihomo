@@ -1,14 +1,13 @@
 name: Custom Release
 
 on:
+  schedule:
+    - cron: "17 1 * * *" # 09:17 UTC+8, once per day
   push:
-    branches: [custom]
-    paths-ignore:
-      - "docs/**"
-      - "README.md"
-      - ".github/ISSUE_TEMPLATE/**"
+    tags:
+      - custom
+      - "v*-custom.*"
   workflow_dispatch:
-  workflow_call:
 
 permissions:
   contents: read
@@ -27,25 +26,50 @@ env:
 
 jobs:
   test:
-    if: github.ref == 'refs/heads/custom'
+    if: github.event_name == 'push' || github.ref == 'refs/heads/custom'
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: write
     outputs:
       upstream: ${{ steps.version.outputs.upstream }}
       version: ${{ steps.version.outputs.version }}
+      commit: ${{ steps.version.outputs.commit }}
     env:
       SKIP_INTEROP_TEST: "1"
       SKIP_CONCURRENT_TEST: "1"
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
+          ref: ${{ github.event_name == 'push' && github.ref || 'custom' }}
           fetch-depth: 0
-          persist-credentials: false
+          token: ${{ secrets.UPSTREAM_SYNC_TOKEN || github.token }}
+      - name: Merge latest upstream stable release
+        if: github.event_name != 'push'
+        id: sync
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          upstream=$(gh api repos/MetaCubeX/mihomo/releases/latest --jq '.tag_name')
+          [[ "$upstream" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          git fetch --no-tags https://github.com/MetaCubeX/mihomo.git \
+            "refs/tags/$upstream:refs/tags/upstream/$upstream"
+          if git merge-base --is-ancestor "upstream/$upstream" HEAD; then
+            echo "Upstream $upstream is already merged."
+            echo 'changed=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git merge --no-edit "upstream/$upstream"
+          echo 'changed=true' >> "$GITHUB_OUTPUT"
       - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c
+        if: github.event_name == 'push' || steps.sync.outputs.changed == 'true'
         with:
           go-download-base-url: https://github.com/MetaCubeX/go/releases/download/build
           go-version: "1.26"
       - name: Determine version
+        if: github.event_name == 'push' || steps.sync.outputs.changed == 'true'
         id: version
         run: |
           git fetch --no-tags https://github.com/MetaCubeX/mihomo.git \
@@ -53,16 +77,38 @@ jobs:
           upstream=$(git describe --tags --match 'upstream/v[0-9]*' --exclude '*-*' --abbrev=0)
           upstream=${upstream#upstream/}
           [[ "$upstream" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
-          printf 'upstream=%s\nversion=%s-custom.%s\n' \
-            "$upstream" "$upstream" "$GITHUB_RUN_NUMBER" >> "$GITHUB_OUTPUT"
+          commit=$(git rev-parse HEAD)
+          revision=$GITHUB_RUN_NUMBER
+          version="${upstream}-custom.${revision}"
+          while git show-ref --verify --quiet "refs/tags/$version"; do
+            [[ $(git rev-list -n 1 "$version") == "$commit" ]] && break
+            revision=$((revision + 1))
+            version="${upstream}-custom.${revision}"
+          done
+          if [[ "$GITHUB_EVENT_NAME" == push && "$GITHUB_REF_NAME" != custom ]]; then
+            [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-custom\.[1-9][0-9]*$ ]]
+            [[ "$GITHUB_REF_NAME" == "$upstream"-custom.* ]]
+            version=$GITHUB_REF_NAME
+          fi
+          printf 'upstream=%s\nversion=%s\ncommit=%s\n' \
+            "$upstream" "$version" "$commit" >> "$GITHUB_OUTPUT"
       - name: Test
+        if: github.event_name == 'push' || steps.sync.outputs.changed == 'true'
         run: |
           go version
           go test ./...
           go test -tags with_gvisor ./...
+      - name: Push tested merge to custom
+        if: github.event_name != 'push' && steps.sync.outputs.changed == 'true'
+        run: |
+          if ! git push origin HEAD:refs/heads/custom; then
+            echo '::error::Push failed. If upstream changed workflows, configure UPSTREAM_SYNC_TOKEN with Contents and Workflows write permissions. A concurrent custom update also requires a new run.'
+            exit 1
+          fi
 
   build:
     needs: test
+    if: needs.test.outputs.version != ''
     strategy:
       fail-fast: false
       matrix:
@@ -80,6 +126,7 @@ jobs:
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
+          ref: ${{ needs.test.outputs.commit }}
           persist-credentials: false
       - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c
         with:
@@ -113,6 +160,7 @@ jobs:
       GH_REPO: ${{ github.repository }}
       UPSTREAM: ${{ needs.test.outputs.upstream }}
       VERSION: ${{ needs.test.outputs.version }}
+      SOURCE_SHA: ${{ needs.test.outputs.commit }}
     steps:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
@@ -131,13 +179,13 @@ jobs:
           else
             printf '%s\n' \
               "Upstream: MetaCubeX/mihomo ${UPSTREAM} (Meta)." \
-              "Source commit: ${GITHUB_SHA}" \
+              "Source commit: ${SOURCE_SHA}" \
               '' \
               'macOS arm64: ad-hoc signed executable (.gz).' \
               'Windows amd64: x86-64 v1 executable (.zip).' \
               'Both builds include with_gvisor and use MetaCubeX/go 1.26.' \
               > "$RUNNER_TEMP/custom-release-notes.txt"
-            gh release create "$tag" --target "$GITHUB_SHA" --title "$VERSION" \
+            gh release create "$tag" --target "$SOURCE_SHA" --title "$VERSION" \
               --draft --notes-file "$RUNNER_TEMP/custom-release-notes.txt"
           fi
           sha256sum *.gz *.zip > SHA256SUMS
