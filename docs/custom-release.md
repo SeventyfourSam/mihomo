@@ -14,8 +14,8 @@ workflow. A conflict limited to `go.sum` is merged by module/version entries,
 preserving additions and deletions and rejecting differing hashes for the same
 entry. Conflicts in `go.mod` or source files still require manual resolution.
 Custom frpc requirements live in separate blocks to avoid adjacent upstream
-dependency edits. The workflow never force
-pushes the branch or automatically resolves conflicts. No release is published
+dependency edits. The workflow never force-pushes the branch or automatically
+resolves conflicts outside `go.sum`. No release is published
 unless both platform builds succeed. Ordinary pushes to `custom` do not build.
 
 To build local custom changes manually, push a version tag:
