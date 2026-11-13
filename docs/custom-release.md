@@ -10,7 +10,11 @@ the same check immediately.
 When a new upstream release exists, the workflow merges it locally, runs tests,
 then pushes the tested merge and its version tag atomically and packages that
 exact commit. Merge conflicts, test failures, or a rejected push stop the
-workflow. It never force
+workflow. A conflict limited to `go.sum` is merged by module/version entries,
+preserving additions and deletions and rejecting differing hashes for the same
+entry. Conflicts in `go.mod` or source files still require manual resolution.
+Custom frpc requirements live in separate blocks to avoid adjacent upstream
+dependency edits. The workflow never force
 pushes the branch or automatically resolves conflicts. No release is published
 unless both platform builds succeed. Ordinary pushes to `custom` do not build.
 

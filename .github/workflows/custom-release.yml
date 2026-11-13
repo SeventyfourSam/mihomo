@@ -69,8 +69,14 @@ jobs:
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git merge --no-edit "upstream/$upstream"
+          if ! git merge --no-edit "upstream/$upstream"; then
+            python3 scripts/merge-go-sum.py
+            git commit --no-edit
+          fi
           echo 'changed=true' >> "$GITHUB_OUTPUT"
+      - name: Test checksum merge helper
+        if: steps.trigger.outputs.skip != 'true' && (github.event_name == 'push' || steps.sync.outputs.changed == 'true')
+        run: python3 -B -m unittest discover -s scripts -p 'test_merge_go_sum.py'
       - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c
         if: steps.trigger.outputs.skip != 'true' && (github.event_name == 'push' || steps.sync.outputs.changed == 'true')
         with:
